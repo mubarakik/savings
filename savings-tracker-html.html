@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Savings Tracker</title>
+    <link rel="stylesheet" href="savings-tracker-css.css">
+    <link rel="manifest" href="savings-tracker-manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <meta name="theme-color" content="#4285f4">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Savings Tracker</h1>
+            <button id="add-goal-btn">+ Add Savings Goal</button>
+        </header>
+
+        <main id="goals-container" class="goals-grid">
+            <!-- Savings goals will be dynamically populated here -->
+        </main>
+
+        <!-- Modal for adding new savings goal -->
+        <div id="add-goal-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Add New Savings Goal</h2>
+                <form id="new-goal-form">
+                    <input type="text" id="goal-name" placeholder="Goal Name" required>
+                    <input type="number" id="goal-amount" placeholder="Total Goal Amount" required>
+                    <button type="submit">Create Goal</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for goal details -->
+        <div id="goal-details-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <div id="goal-details-content">
+                    <!-- Goal details will be dynamically populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="savings-tracker-js.js"></script>
+</body>
+</html>
