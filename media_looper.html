@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Looper</title>
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #6a98d4;
+            --background-color: #f5f7fa;
+            --card-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #d1d9e6;
+            --success-color: #4caf50;
+            --error-color: #f44336;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .description {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .card {
+            background-color: var(--card-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+        }
+
+        .input-group input {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .input-group input[type="file"] {
+            padding: 8px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .media-container {
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #youtube-player, #audio-player {
+            width: 100%;
+            max-width: 100%;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #youtube-player {
+            aspect-ratio: 16/9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .time-display {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .time-display span {
+            font-weight: bold;
+        }
+
+        .notification {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+
+        .success {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .error {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        #loading-indicator {
+            margin: 10px;
+            display: none;
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 600px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Media Looper</h1>
+            <p class="description">Upload an audio file or enter a YouTube URL to play and loop specific sections</p>
+        </header>
+
+        <div class="card">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="audio-upload">Upload Audio File (.mp3, .wav)</label>
+                    <input type="file" id="audio-upload" accept="audio/*">
+                </div>
+                
+                <div class="input-group">
+                    <label for="youtube-url">Or Enter YouTube URL</label>
+                    <input type="text" id="youtube-url" placeholder="https://www.youtube.com/watch?v=...">
+                    <button id="load-youtube">Load YouTube Video</button>
+                    <div id="loading-indicator">Loading YouTube API...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="notification" class="notification"></div>
+
+        <div class="media-container">
+            <!-- YouTube Player will be embedded here -->
+            <div id="youtube-player"></div>
+            
+            <!-- Audio Player -->
+            <audio id="audio-player" controls></audio>
+
+            <div class="controls">
+                <button id="toggle-play">Play</button>
+                <button id="select-loop" disabled>Select Start</button>
+                <button id="clear-loop" disabled>Clear Loop</button>
+            </div>
+
+            <div class="time-display">
+                <div>Current Time: <span id="current-time">00:00</span></div>
+                <div>Loop: <span id="loop-start">--:--</span> to <span id="loop-end">--:--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Main application class
+        class MediaLooper {
+            constructor() {
+                // DOM Elements
+                this.audioUploadEl = document.getElementById('audio-upload');
+                this.youtubeUrlEl = document.getElementById('youtube-url');
+                this.loadYoutubeBtn = document.getElementById('load-youtube');
+                this.youtubePlayerEl = document.getElementById('youtube-player');
+                this.audioPlayerEl = document.getElementById('audio-player');
+                this.togglePlayBtn = document.getElementById('toggle-play');
+                this.selectLoopBtn = document.getElementById('select-loop');
+                this.clearLoopBtn = document.getElementById('clear-loop');
+                this.currentTimeEl = document.getElementById('current-time');
+                this.loopStartEl = document.getElementById('loop-start');
+                this.loopEndEl = document.getElementById('loop-end');
+                this.notificationEl = document.getElementById('notification');
+                this.loadingIndicatorEl = document.getElementById('loading-indicator');
+
+                // State
+                this.activeMedia = null; // 'audio' or 'youtube'
+                this.youtubePlayer = null;
+                this.youtubeReady = false;
+                this.youtubeAPILoaded = false;
+                this.youtubeAPILoading = false;
+                this.loopState = 'inactive'; // 'inactive', 'start-selected', 'end-selected'
+                this.loopStart = null;
+                this.loopEnd = null;
+                this.isPlaying = false;
+                this.checkTimeInterval = null;
+                this.pendingYouTubeURL = null;
+
+                // Initialize
+                this.initEventListeners();
+            }
+
+            // Set up event listeners
+            initEventListeners() {
+                // Audio file upload
+                this.audioUploadEl.addEventListener('change', (e) => this.handleAudioUpload(e));
+                
+                // YouTube loading
+                this.loadYoutubeBtn.addEventListener('click', () => {
+                    const url = this.youtubeUrlEl.value.trim();
+                    if (!url) {
+                        this.showNotification('Please enter a valid YouTube URL', 'error');
+                        return;
+                    }
+                    
+                    // Extract the video ID
+                    const videoId = this.extractYouTubeID(url);
+                    if (!videoId) {
+                        this.showNotification('Invalid YouTube URL', 'error');
+                        return;
+                    }
+
+                    // Store the URL for loading after YouTube API is ready
+                    this.pendingYouTubeURL = url;
+                    
+                    // Load YouTube API if not already loaded
+                    if (!this.youtubeAPILoaded && !this.youtubeAPILoading) {
+                        this.loadYouTubeAPI();
+                    } else if (this.youtubeAPILoaded) {
+                        // If API already loaded, load the video
+                        this.loadYouTubeVideo(this.pendingYouTubeURL);
+                    } else {
+                        // API is loading, show loading indicator
+                        this.loadingIndicatorEl.style.display = 'block';
+                    }
+                });
+                
+                // Playback control
+                this.togglePlayBtn.addEventListener('click', () => this.togglePlay());
+                
+                // Loop selection
+                this.selectLoopBtn.addEventListener('click', () => this.handleLoopSelection());
+                this.clearLoopBtn.addEventListener('click', () => this.clearLoop());
+            }
+
+            // Load the YouTube API script
+            loadYouTubeAPI() {
+                this.youtubeAPILoading = true;
+                this.loadingIndicatorEl.style.display = 'block';
+                
+                // Define the callback function for when the API is ready
+                window.onYouTubeIframeAPIReady = () => {
+                    this.youtubeAPILoaded = true;
+                    this.youtubeAPILoading = false;
+                    this.loadingIndicatorEl.style.display = 'none';
+                    
+                    // Load any pending YouTube URL
+                    if (this.pendingYouTubeURL) {
+                        this.loadYouTubeVideo(this.pendingYouTubeURL);
+                    }
+                };
+                
+                // Create YouTube API script tag
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                
+                // Insert the script before the first script tag
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            }
+
+            // Handle audio file upload
+            handleAudioUpload(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    // Clear any YouTube video if playing
+                    if (this.activeMedia === 'youtube') {
+                        this.resetYouTubePlayer();
+                    }
+                    
+                    // Set up audio player
+                    const fileURL = URL.createObjectURL(file);
+                    this.audioPlayerEl.src = fileURL;
+                    this.audioPlayerEl.style.display = 'block';
+                    this.activeMedia = 'audio';
+                    
+                    // Reset loop state
+                    this.clearLoop();
+                    
+                    // Enable controls
+                    this.togglePlayBtn.disabled = false;
+                    this.selectLoopBtn.disabled = false;
+                    
+                    // Show notification
+                    this.showNotification(`Audio file "${file.name}" loaded successfully`, 'success');
+                    
+                    // Start time tracking
+                    this.startTimeTracking();
+                }
+            }
+
+            // Extract YouTube video ID from URL
+            extractYouTubeID(url) {
+                const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+                const match = url.match(regExp);
+                return (match && match[7].length === 11) ? match[7] : null;
+            }
+
+            // Load YouTube video
+            loadYouTubeVideo(url) {
+                if (!url) {
+                    return;
+                }
+
+                const videoId = this.extractYouTubeID(url);
+                if (!videoId) {
+                    this.showNotification('Invalid YouTube URL', 'error');
+                    return;
+                }
+
+                // Clear audio if playing
+                if (this.activeMedia === 'audio') {
+                    this.audioPlayerEl.pause();
+                    this.audioPlayerEl.src = '';
+                    this.audioPlayerEl.style.display = 'none';
+                }
+
+                // Reset existing YouTube player if any
+                if (this.youtubePlayer) {
+                    this.resetYouTubePlayer();
+                }
+
+                // Create a container div for the player
+                const container = document.createElement('div');
+                this.youtubePlayerEl.innerHTML = '';
+                this.youtubePlayerEl.appendChild(container);
+                this.youtubePlayerEl.style.display = 'block';
+
+                // Create new YouTube player
+                this.youtubePlayer = new YT.Player(container, {
+                    height: '360',
+                    width: '640',
+                    videoId: videoId,
+                    playerVars: {
+                        'playsinline': 1,
+                        'controls': 1,
+                        'disablekb': 0
+                    },
+                    events: {
+                        'onReady': (event) => {
+                            this.activeMedia = 'youtube';
+                            this.clearLoop();
+                            this.togglePlayBtn.disabled = false;
+                            this.selectLoopBtn.disabled = false;
+                            this.showNotification('YouTube video loaded successfully', 'success');
+                            this.startTimeTracking();
+                        },
+                        'onStateChange': (event) => {
+                            // Update play state based on YouTube player state
+                            if (event.data === YT.PlayerState.PLAYING) {
+                                this.isPlaying = true;
+                                this.togglePlayBtn.textContent = 'Pause';
+                            } else if (event.data === YT.PlayerState.PAUSED || 
+                                      event.data === YT.PlayerState.ENDED) {
+                                this.isPlaying = false;
+                                this.togglePlayBtn.textContent = 'Play';
+                            }
+                        },
+                        'onError': (event) => {
+                            this.showNotification('Error loading video. Please check the URL and try again.', 'error');
+                        }
+                    }
+                });
+            }
+
+            // Reset YouTube player
+            resetYouTubePlayer() {
+                if (this.youtubePlayer) {
+                    this.youtubePlayer.destroy();
+                    this.youtubePlayer = null;
+                    this.youtubePlayerEl.innerHTML = '';
+                }
+            }
+
+            // Toggle play/pause
+            togglePlay() {
+                if (!this.activeMedia) return;
+
+                if (this.activeMedia === 'audio') {
+                    if (this.audioPlayerEl.paused) {
+                        this.audioPlayerEl.play();
+                        this.isPlaying = true;
+                        this.togglePlayBtn.textContent = 'Pause';
+                    } else {
+                        this.audioPlayerEl.pause();
+                        this.isPlaying = false;
+                        this.togglePlayBtn.textContent = 'Play';
+                    }
+                } else if (this.activeMedia === 'youtube' && this.youtubePlayer) {
+                    try {
+                        const state = this.youtubePlayer.getPlayerState();
+                        if (state === YT.PlayerState.PLAYING) {
+                            this.youtubePlayer.pauseVideo();
+                            this.isPlaying = false;
+                            this.togglePlayBtn.textContent = 'Play';
+                        } else {
+                            this.youtubePlayer.playVideo();
+                            this.isPlaying = true;
+                            this.togglePlayBtn.textContent = 'Pause';
+                        }
+                    } catch (e) {
+                        this.showNotification('YouTube player is not ready yet. Please try again in a moment.', 'error');
+                    }
+                }
+            }
+
+            // Handle loop selection button clicks
+            handleLoopSelection() {
+                if (!this.activeMedia) return;
+
+                const currentTime = this.getCurrentTime();
+
+                // First click: capture start time
+                if (this.loopState === 'inactive') {
+                    this.loopStart = currentTime;
+                    this.loopState = 'start-selected';
+                    this.selectLoopBtn.textContent = 'Select End';
+                    this.loopStartEl.textContent = this.formatTime(this.loopStart);
+                    this.showNotification('Loop start point set', 'success');
+                } 
+                // Second click: capture end time
+                else if (this.loopState === 'start-selected') {
+                    if (currentTime <= this.loopStart) {
+                        this.showNotification('End time must be after start time', 'error');
+                        return;
+                    }
+                    this.loopEnd = currentTime;
+                    this.loopState = 'end-selected';
+                    this.selectLoopBtn.textContent = 'Play Loop';
+                    this.loopEndEl.textContent = this.formatTime(this.loopEnd);
+                    this.clearLoopBtn.disabled = false;
+                    this.showNotification('Loop end point set', 'success');
+                } 
+                // Third click: start the loop
+                else if (this.loopState === 'end-selected') {
+                    this.startLoop();
+                    this.selectLoopBtn.textContent = 'Loop Active';
+                    this.selectLoopBtn.disabled = true;
+                    this.showNotification('Loop playback started', 'success');
+                }
+            }
+
+            // Start looping between selected points
+            startLoop() {
+                // Make sure we're playing
+                if (!this.isPlaying) {
+                    this.togglePlay();
+                }
+                
+                // Set current time to loop start
+                this.setCurrentTime(this.loopStart);
+                
+                // Clear any existing interval
+                if (this.checkTimeInterval) {
+                    clearInterval(this.checkTimeInterval);
+                }
+                
+                // Set up interval to check current time
+                this.checkTimeInterval = setInterval(() => {
+                    const currentTime = this.getCurrentTime();
+                    
+                    // If we've reached or passed the loop end, go back to loop start
+                    if (currentTime >= this.loopEnd) {
+                        this.setCurrentTime(this.loopStart);
+                    }
+                }, 50); // Check every 50ms for precision
+            }
+
+            // Clear the loop settings
+            clearLoop() {
+                if (this.checkTimeInterval) {
+                    clearInterval(this.checkTimeInterval);
+                    this.checkTimeInterval = null;
+                }
+                
+                this.loopState = 'inactive';
+                this.loopStart = null;
+                this.loopEnd = null;
+                this.loopStartEl.textContent = '--:--';
+                this.loopEndEl.textContent = '--:--';
+                this.selectLoopBtn.textContent = 'Select Start';
+                this.selectLoopBtn.disabled = false;
+                this.clearLoopBtn.disabled = true;
+            }
+
+            // Get current playback time
+            getCurrentTime() {
+                if (this.activeMedia === 'audio') {
+                    return this.audioPlayerEl.currentTime;
+                } else if (this.activeMedia === 'youtube' && this.youtubePlayer) {
+                    try {
+                        return this.youtubePlayer.getCurrentTime();
+                    } catch (e) {
+                        return 0;
+                    }
+                }
+                return 0;
+            }
+
+            // Set current playback time
+            setCurrentTime(time) {
+                if (this.activeMedia === 'audio') {
+                    this.audioPlayerEl.currentTime = time;
+                } else if (this.activeMedia === 'youtube' && this.youtubePlayer) {
+                    try {
+                        this.youtubePlayer.seekTo(time, true);
+                    } catch (e) {
+                        this.showNotification('Error seeking to time point', 'error');
+                    }
+                }
+            }
+
+            // Start tracking media time
+            startTimeTracking() {
+                // Update time display every 100ms
+                setInterval(() => {
+                    if (this.activeMedia) {
+                        const currentTime = this.getCurrentTime();
+                        this.currentTimeEl.textContent = this.formatTime(currentTime);
+                    }
+                }, 100);
+            }
+
+            // Format time in MM:SS format
+            formatTime(seconds) {
+                if (isNaN(seconds)) return '--:--';
+                
+                seconds = Math.floor(seconds);
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                
+                return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+
+            // Show notification message
+            showNotification(message, type) {
+                this.notificationEl.textContent = message;
+                this.notificationEl.className = `notification ${type}`;
+                this.notificationEl.style.display = 'block';
+                
+                // Hide notification after 3 seconds
+                setTimeout(() => {
+                    this.notificationEl.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Initialize the application when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = new MediaLooper();
+        });
+    </script>
+</body>
+</html>

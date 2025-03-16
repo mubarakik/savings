@@ -2,6 +2,7 @@ const CACHE_NAME = 'savings-tracker-v1';
 const urlsToCache = [
     '/savings/',
     '/savings/index.html',
+    '/savings/media_looper',
     '/savings/styles.css',
     '/savings/app.js',
     '/savings/icons/icon-192x192.png',
